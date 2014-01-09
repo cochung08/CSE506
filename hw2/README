@@ -1,0 +1,80 @@
+ASSIGNMENT-2 README FILE
+
+GOAL: To add integrity support for files and directories in wrapfs module. The existing wrapfs stackable file system is enhanced with these features.
+
+Steps to compile and install module:
+	1. make: Builds the modified wrapfs module.
+	2. insmod wrapfs.ko
+	3. mount -t ext3 /dev/sdb1 /n/scratch -o user_xattr
+   	   mount -t wrapfs /n/scratch/ /tmp/
+	4. cd /tmp/ and run test cases.
+
+while developing, the following steps are followed, since it required to compile the code.
+	1. In /usr/src/hw2-svavilapalli directory run: make modules modules_install install.
+	2. In /usr/src/hw2-svavilapalli/fs/wrapfs directory run: umount /tmp/
+	3. rmmod wrapfs
+	4. insmod wrapfs.ko
+	5. mount -t wrapfs /n/scratch/ /tmp/
+Then, cd /tmp/ to see whether changes in wrapfs module are reflected or not.
+
+Files MODIFIED:
+In Directory: /usr/src/hw2-svavilapalli/fs/wrafps/
+	1. file.c
+	2. inode.c
+	3. wrapfs.h
+	4. Makefile
+
+Files ADDED:
+In Directory: /usr/src/hw2-svavilapalli/fs/wrapfs/
+	1. wrapfs_xattr.c
+	2. README
+	3. vmware.config (changed in order to make the kernel bootable).
+
+Features implemented:
+1. The wrapfs module supports four Extended Atrribute operations for setting/retrieving/listing/removing the attributes.
+	setfattr, getfattr, getfattr -d, setfattr -x 
+
+2. It supports two extended attributes, "user.has_integrity" (0/1) and "user.integrity_val"(checksum of the file).
+
+3. It allows only two values(0/1) of "user.has_integrity" attribute and non root user cannot set this particular attribute. 0-- means integrity value is not set
+and 1 -- calculates checksum and updates the integrity val.
+
+4. Niether root nor non-root user can set integrity val. It can only be accessed through has_integrity values by the root user.If user tries to set this value, this "operation not supported" message is displayed.
+
+5. Whenever a file is opened, if has_integrity is set to 1, the checksum of the file is calculated and compared with the stored checksum and throws an error if there is a mismatch. It cannot be accessed by non root user. Root user can only access by setting has_integrity to zero.
+
+6.A directory can have "has_integrity" value. It can be set to 1/0. Any file created in such a directory with has_integrity to 1 will inherit this property and so it will have integral_val and has_integreity set to 1.
+
+7. The checksum by default is calculated using MD5 algorithm. And checksum size is 16. It is stored/retrieved in binary format only.
+
+8. Changed the vmware.config given as part of homework so that the system can be booted properly.
+
+9. while setting extended attributes, the attribute name should be exactly in the given format USER.XXXX. Otherwise, it is not supported.
+
+Additional Details:
+1.In wrapfs.h, macros required for the implementation are defined. 
+2.To handle read/write concurrent cases of checksum, w_dirty of integer type is added in struct wrapfs_inode_info and two functions wrapfs_set_write_dirty and wrapfs_get_write_dirty are defined in order to set and get this value. This value has been used to update the integrity while updating the file and closing it.
+3.The above dirty bit is set when write operation is called, truncate operation in setattr is called. The dirty bit is reset after updating the checksum of the file properly.
+
+TESTING:
+1. All the cases mentioned in the homework are tested properly and validated.
+2. After implementing the features, complete LTP test suite is run on the wrapfs and the test was successful.
+3. For the four extended attribute operations user land tools are used.
+setting attribute: setfattr -n attribute_name -v value filename
+getting attribute: getfattr filename
+listing attribute: getfattr -d filename
+removing attribute:setfattr -x attribute filename
+4. Tested the other cases of integrity mismatch/other concurrent cases with command "cat"; cat>>filename(for creation/appending), cat>filename(for truncation) and cat filename(for reading).
+5. mouunt/unmount operations run properly without any problem.
+
+EXTRA CREDIT:
+1. To compile the code under extra credit, open wrapfs.h uncomment line 31-33. I'm trying to figure out a better solution  than this.
+2. Algorithms supported: 
+   DEFAULT: MD5, SHA1, SHA224, SHA256.
+3. By reading crypto struct,we can get the checksum size. But the implementation is done only for the above 4 algorithms by assigning sizes manually.
+4. It can be set using user.integrity_type and everytime algorithm is changed if has_integrity is set to 1, then it is recomputed.
+
+REFERENCES:
+1. UNIONFS source code available at: http://git.fsl.cs.sunysb.edu/?p=unionfs-3.2.y.git;a=tree;f=fs/unionfs;h=a61460231142a7b2cf8313d48f655191028b4196;hb=HEAD
+2. Existing WRAPFS source code and LXR.
+3. ECRYPTFS source code availabe at LXR.

@@ -1,0 +1,132 @@
+ASSIGNMENT-3 README FILE
+
+--------------------------------------------------
+hw3-cse506g02
+Sudheer kumar vavilapalli-109203795
+Gaurav piyush-108996990
+Manoj Tammali-108602166
+--------------------------------------------------
+
+GOAL: To support "address_space operations", file data encryptiong/decryption in
+ wrapfs module. The existing wrapfs stackable file system is enhanced with these
+ features.
+
+Steps to compile and install module:
+        1. make: Builds the modified wrapfs module.
+        2. insmod wrapfs.ko
+        3. mount -t ext3 /dev/sdb1 /n/scratch -o 'options'
+           mount -t wrapfs /n/scratch /tmp/
+        4. cd /tmp/ and run test cases.
+To compile the code with WRAPFS_CRYPTO(for Task 3 of the assignment)
+		5. make CRYPTO+=-DWRAPFS_CRYPTO.
+		6. Run gcc -Wall -Werror -I/lib/modules/$(shell uname -r)/build/arch/x86/include keyset.c -o keyset to set the key for Task 3.
+
+Files MODIFIED:
+-----------------------------------------------------------------
+In Directory: /usr/src/hw3-cse506g02/fs/wrapfs/
+        1. Makefile
+	2. wrapfs.h
+	3. file.c
+	4. main.c
+	5. mmap.c
+	6. super.c
+		
+Files ADDED:
+--------------------------------------------------------------------
+In Directory: /usr/src/hw3-cse506g02/fs/wrapfs/
+		1. crypto.c
+		2. debug.c
+		3. keyset.c
+
+IMPLEMENTATION DETAILS:
+----------------------------------------------------------------------
+1. keyset.c 	- User program to pass the key. It sets the key required for encryption and decryption options. The key is passed via ioctl. The IOCTL NUMBER is 6767.
+2. wrapfs.h 	- Added required flags for mounting options(mmap, debug), added functions for crypto operations etc.
+3. file.c   	- Added conditions to support both vm operations and address space operations.
+4. main.c	- Handled the cases for mmap option supporting while mounting the device.
+5. mmap.c	- Implemented the address space operations and encrypt and decrypt functions are called.
+6. super.c	- Added cases for remount operations.
+7. crypto.c	- Implemented encrypt, decrypt functions for page.
+8. debug.c	- Added function to check various conditions for debug support.
+
+DESIGN CONSIDERATIONS:
+----------------------------------------------------------------------
+1. KEY should be passed via ioctl only. If no key is passed, read/write operations are not allowed. It returns -ENOKEY error. After mounting the device with mmap optionthe user program should be run and key should be passed as argument.
+	./keyset 6879
+2. Only one key is supported per instance of mount.In case if key is passed, it is simply ignored and message will be printed in debug mode.
+3. If device is mounted with mmap option, then address space operations are called otherwise vm_operations are called.
+3. Crypto operations are supported only if code is compiled with CRYPTO option as mentioned in the steps. FOR CRYPTO OPERATIONS, CODE SHOULD BE COMPILED WITH CRYPTO OPTION.
+5. Encryption and Decryption uses AES256 in "CTR" mode.
+6. Maximum key length : 32 bytes - If key of size > 32 given then the first 32 bytes are considered.
+
+TEST CASES:
+Case 1: mmap disabled
+	NO ENCRYPTION/DECRYPTION. 
+	Default vm_ops->fault
+
+Case 2: mmap enabled, WRAPFS_CRYPTO disabled
+	Address space operations used
+	No Encryption/decryption.
+
+Case 3: mmap enabled, WRAPFS_CRYPTO enabled
+	Address space ops used
+	Encrypted data in lower_file. Decrypted data at upper file.
+	Case 3(a): 
+		Key is 0 - No encryption decryption.
+		printk the error to user.
+	Case 3(b):
+		Key of length > 32 bytes - Consider only the first 32 bytes.
+	Case 3(c): 
+		No key then no encryption decryption. 
+		Return -ENOKEY to user.
+
+NOTE: 
+	KEY SHOULD BE SET AFTER UMOUNT and before entering the mount point (/tmp) of wrapfs because the key does not refresh.
+
+Case 1: Create a file ,write and then read
+	1. Create a file - Go to /tmp/ and cat > test.txt
+	2. Write on file(test.txt)
+	3. Now umount wrapfs
+	4. Meanwhile one can go to /n/scratch to read test.txt to see the encrypted file data
+	5. Again mount wrapfs :
+		#mount -t wrapfs /n/scratch /tmp
+	6. Now read the file  - cat test.txt 
+		One can see the decrypted data.
+
+Case 2: Append data to a file
+	1. Open file in O_APPEND mode and write data to it.
+	2. Follow steps 3 to 6 above to see the decrypted data.
+
+
+REGARDING OOPS:
+-------------------------
+NO kernel OOPS were faced when MKNOD01 was commented.
+	
+EXTRA_CREDIT:
+Debugging/tracing support:
+--------------------------
+Steps to compile:
+	1. make EXTRA_CREDIT+=-DWRAPFS_EXTRA_CREDIT
+	2. insmod wrapfs.ko
+	3. mount -t ext3 /dev/sdb1 /n/scratch 
+	4. mount -t wrapfs /n/scratch /tmp/ -o debug="valid combination"
+	5. cd /tmp/ and run test cases.
+Implementation:
+1. In wrapfs.h, under WRAPFS_EXTRA_CREDIT, another flag DEBUG_SUPPORT is added and this will be enabled when wrapfs module is compiled with EXTRA_CREDIT flag.
+2. UDBG and UDBGE macros are used to print the functions.
+3. The valid combinations are:
+0x01: enable debugging for superblock ops
+0x02: enable debugging for inode ops
+0x04: enable debugging for dentry ops
+0x10: enable debugging for file ops
+0x20: enable debugging for address_space ops
+0x40: enable debugging for all other ops
+4. #mount -t wrapfs /n/scratch /tmp/ remount,debug=0 to remount with necessary options or to turn off the debugging.
+
+REFERENCES:
+-----------------------------------------
+1. UNIONFS source code available at: http://git.fsl.cs.sunysb.edu/?p=unionfs-3.2.y.git;a=tree;f=fs/unionfs;h=a61460231142a7b2cf8313d48f655191028b4196;hb=HEAD
+2. Existing WRAPFS source code and LXR.
+3. ECRYPTFS source code availabe at LXR.
+
+

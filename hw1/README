@@ -1,0 +1,25 @@
+#DEVELOPER: SUDHEER KUMAR VAVILAPALLI
+#IMPLEMENTATION OF FILE INTEGIRTY CHECKING
+#README FILE
+
+Algorithm to calculate the checksum used is "MD5".
+System call implementation is done in sys_xintegrity.c.
+Passing arguments and user level code is done in xhw1.c.
+All the mode structs and other common macros are defind in sys_args.h.
+
+For mode1:
+Inputs are read from console and passed to kernel. After different error checkings, it passes the checksum if present to the user program.It returns appropriate errors if file doesn't exist or if memory is not available or if checksum is not present.
+Inputs: Modenumber(1), filename.
+
+For mode2:
+Password is written in password.txt.
+In this mode,the checksum of a particular file is calcualted and stores it in the xattr of the file.If the password doesn't match it returns an appropriate error. It handles all the error checkings and returns appropriate errors too.
+Inputs:Modenumber(2),filename, password(passwd).
+
+For mode3:
+In this mode, the use can securely open a file. It returns a file descriptor after matching the checksums by calculating and by reading from the xattr. To avoid
+abnormal behvaiour, the fd returned to the user program is closed by the close system call. While giving the mode and flags as input, they should be given in integer forms.
+for example: O_CREAT flag must be given as 16 and mode must be give as 0644.
+Inputs:Modenumber(3),filename,flag(in integer form),mode(in integer form).
+
+For any mode, if wrong mode number or wrong number of inputs are given, it returns an error and system call itself wouldn't execute.
